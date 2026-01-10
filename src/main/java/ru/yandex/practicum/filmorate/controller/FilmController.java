@@ -14,12 +14,12 @@ import java.util.List;
 @RequestMapping("/films")
 @Slf4j
 @RequiredArgsConstructor
-public class FilmController { 
+public class FilmController {
     private final FilmService filmService;
     private static final LocalDate minReleaseDate = LocalDate.of(1895, 12, 28);
 
     @GetMapping
-    public List<Film> findAll() { 
+    public List<Film> findAll() {
         log.info("Запрос на получение всех фильмов");
         return filmService.findAll();
     }
@@ -31,14 +31,14 @@ public class FilmController {
     }
 
     @PostMapping
-    public Film create(@Valid @RequestBody Film film) { 
+    public Film create(@Valid @RequestBody Film film) {
         log.info("Запрос на создание фильма: {}", film);
         validateFilm(film);
         return filmService.create(film);
     }
 
     @PutMapping
-    public Film update(@Valid @RequestBody Film film) { 
+    public Film update(@Valid @RequestBody Film film) {
         log.info("Запрос на обновление фильма: {}", film);
         validateFilm(film);
         return filmService.update(film);

@@ -12,7 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/users")
 @Slf4j
-public class UserController { 
+public class UserController {
     private final UserService userService;
 
     @Autowired
@@ -21,7 +21,7 @@ public class UserController {
     }
 
     @GetMapping
-    public List<User> findAll() { 
+    public List<User> findAll() {
         log.info("Запрос на получение всех пользователей");
         return userService.findAll();
     }
@@ -33,7 +33,7 @@ public class UserController {
     }
 
     @PostMapping
-    public User create(@Valid @RequestBody User user) { 
+    public User create(@Valid @RequestBody User user) {
         log.info("Запрос на создание пользователя: {}", user);
         if (user.getName() == null || user.getName().isBlank()) {
             user.setName(user.getLogin());
