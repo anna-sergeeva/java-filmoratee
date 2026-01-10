@@ -8,7 +8,7 @@ import java.time.LocalDate;
 
 @Data
 public class User {
-    private int id;
+    private Integer id;
 
     @NotBlank(message = "Электронная почта не может быть пустой", groups = {BuildOperations.class})
     @Email(message = "Электронная почта должна содержать символ @ и быть корректной", groups = {BuildOperations.class, UpdateOperations.class})

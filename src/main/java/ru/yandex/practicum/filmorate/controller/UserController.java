@@ -14,6 +14,7 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/users")
+@Validated
 public class UserController {
 
     private final Map<Integer, User> users = new HashMap<>();
@@ -35,36 +36,49 @@ public class UserController {
     }
 
     @PutMapping
-    public User updateUser(@RequestBody User newUser) {
-        // проверяем необходимые условия
-        int id = newUser.getId();
-        if (!users.containsKey(id)) {
+    public User updateUser(@Valid @RequestBody User newUser) {
+    // 1. Проверяем, что id указан (обязательное поле для PUT)
+        if (newUser.getId() == null) {
             log.warn("Ошибка при обновлении пользователя {}: Должен быть указан id (идентификатор)", newUser);
             throw new ValidationException("Должен быть указан id (идентификатор)");
         }
-        if (users.containsKey(newUser.getId())) {
-            User oldUser = users.get(newUser.getId());
-            if (newUser.getBirthday() != null) {
-                oldUser.setBirthday(newUser.getBirthday());
-            }
-            if (newUser.getEmail() != null) {
-                oldUser.setEmail(newUser.getEmail());
-            }
-            if (newUser.getName() != null) {
-                oldUser.setName(newUser.getName());
-            }
-            if (newUser.getLogin() != null) {
-                oldUser.setLogin(newUser.getLogin());
-            }
-            // заменяем имя на логин, если имя пустое
-            if (oldUser.getName().isBlank()) {
-                oldUser.setName(oldUser.getLogin());
-            }
-            log.info("Данные пользователя {} обновлены", oldUser);
-            return oldUser;
+
+        Integer id = newUser.getId();
+
+    // 2. Проверяем существование пользователя в хранилище
+        if (!users.containsKey(id)) {
+            log.warn("Пользователь с id = {} не найден", id);
+            throw new NotFoundException("Пользователь с id = " + id + " не найден");
         }
-        log.warn("Пользователь с id = {} не найден", newUser.getId());
-        throw new NotFoundException("Пользователь с id = " + newUser.getId() + " не найден");
+
+        User oldUser = users.get(id);
+
+    // 3. Обновляем поля только если они не null в новом объекте
+        if (newUser.getBirthday() != null) {
+            oldUser.setBirthday(newUser.getBirthday());
+        }
+    
+        if (newUser.getEmail() != null) {
+            oldUser.setEmail(newUser.getEmail());
+        }
+    
+        if (newUser.getName() != null) {
+            oldUser.setName(newUser.getName());
+        }
+    
+        if (newUser.getLogin() != null) {
+            oldUser.setLogin(newUser.getLogin());
+        }
+
+    // 4. Если имя пустое — заменяем на логин (по бизнес-логике)
+        if (oldUser.getName() != null && oldUser.getName().isBlank()) {
+            oldUser.setName(oldUser.getLogin());
+        }
+
+    // 5. Логируем успешное обновление
+        log.info("Данные пользователя {} обновлены", oldUser);
+
+        return oldUser;
     }
 
     // вспомогательный метод для генерации идентификатора нового пользователя
