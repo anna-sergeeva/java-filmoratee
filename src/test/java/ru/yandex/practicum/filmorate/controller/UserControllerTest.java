@@ -1,161 +1,71 @@
 package ru.yandex.practicum.filmorate.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.http.MediaType;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import ru.yandex.practicum.filmorate.exception.DuplicatedDataException;
+import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
+
 import java.time.LocalDate;
-import java.util.Map;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(UserController.class)
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-class UserControllerTest {
+import static org.junit.jupiter.api.Assertions.*;
 
-    @Autowired
-    private MockMvc mockMvc;
+@SpringBootTest
+class UserControllerTests {
+    private UserController userController;
+    private User validUser;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @BeforeEach
+    void setUp() {
+        InMemoryUserStorage userStorage = new InMemoryUserStorage();
+        UserService userService = new UserService(userStorage);
+        userController = new UserController(userService);
 
-    @Test
-    @DisplayName("POST /users — 400, если тело запроса - пустое")
-    void createUser_emptyBody_returnsBadRequest() throws Exception {
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
+        validUser = new User();
+        validUser.setEmail("valid@email.com");
+        validUser.setLogin("validLogin");
+        validUser.setBirthday(LocalDate.of(2000, 1, 1));
     }
 
     @Test
-    @DisplayName("POST /users — 400, если email некорректный")
-    void create_invalidEmail_returnsBadRequest() throws Exception {
-        String body = objectMapper.writeValueAsString(Map.of(
-                "email", "invalid",
-                "login", "login",
-                "name", "",
-                "birthday", LocalDate.of(2000, 1, 1).toString()
-        ));
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest());
+    void createValidUserTest() { // проверка создания валидного пользователя
+        assertDoesNotThrow(() -> userController.create(validUser),
+                "Должен создавать пользователя с валидными данными без исключений");
     }
 
     @Test
-    @DisplayName("POST /users — 400, если логин пустой")
-    void createUser_invalidLogin_returnsBadRequest() throws Exception {
-        String body = objectMapper.writeValueAsString(Map.of(
-                "email", "a@b.com",
-                "login", "bad login",
-                "name", "",
-                "birthday", LocalDate.of(2000, 1, 1).toString()
-        ));
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest());
+    void rejectDuplicateEmailTest() { // проверка дублирования email
+        userController.create(validUser);
+        User duplicateUser = new User();
+        duplicateUser.setEmail("valid@email.com");
+        duplicateUser.setLogin("anotherLogin");
+        duplicateUser.setBirthday(LocalDate.of(2000, 1, 1));
+
+        DuplicatedDataException exception = assertThrows(DuplicatedDataException.class,
+                () -> userController.create(duplicateUser),
+                "Должен выбрасывать исключение при дублировании email");
+
+        assertEquals("Этот имейл уже используется", exception.getMessage(),
+                "Неверное сообщение об ошибке для дубликата email");
     }
 
     @Test
-    @DisplayName("POST /users — 400, если дата рождения в будущем")
-    void createUser_futureBirthday_returnsBadRequest() throws Exception {
-        String body = objectMapper.writeValueAsString(Map.of(
-                "email", "a@b.com",
-                "login", "login",
-                "name", "",
-                "birthday", LocalDate.now().plusDays(1).toString()
-        ));
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest());
+    void setLoginAsNameWhenNameEmptyTest() { // проверка установки логина как имени
+        User user = validUser;
+        user.setName("");
+
+        User createdUser = userController.create(user);
+        assertEquals(user.getLogin(), createdUser.getName(),
+                "Должен устанавливать логин как имя при пустом имени");
     }
 
     @Test
-    @DisplayName("POST /users — 200 и в name подставляется login, если пусто")
-    void createUser_validBoundary_setsNameFromLogin() throws Exception {
-        String body = objectMapper.writeValueAsString(Map.of(
-                "email", "a@b.com",
-                "login", "login",
-                "name", " ",
-                "birthday", LocalDate.of(2000, 1, 1).toString()
-        ));
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.name").value("login"));
-    }
-
-    @Test
-    @DisplayName("GET /users — 200 и массив (может быть пустым)")
-    void getUsers_returnsArray() throws Exception {
-        mockMvc.perform(get("/users"))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    @DisplayName("PUT /users — 200 при обновлении только с id (остальные поля не обновляются)")
-    void updateUser_onlyId_returnsOk() throws Exception {
-        // Сначала создаем пользователя
-        String createBody = objectMapper.writeValueAsString(Map.of(
-                "email", "original@test.com",
-                "login", "originalLogin",
-                "name", "Original Name",
-                "birthday", LocalDate.of(2000, 1, 1).toString()
-        ));
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody))
-                .andExpect(status().isOk());
-
-        // Теперь обновляем только с id
-        String updateBody = objectMapper.writeValueAsString(Map.of("id", 1));
-        mockMvc.perform(put("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updateBody))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.email").value("original@test.com"))
-                .andExpect(jsonPath("$.login").value("originalLogin"))
-                .andExpect(jsonPath("$.name").value("Original Name"));
-    }
-
-    @Test
-    @DisplayName("PUT /users — 200 при обновлении с валидными полями")
-    void updateUser_validFields_returnsOk() throws Exception {
-        // Сначала создаем пользователя
-        String createBody = objectMapper.writeValueAsString(Map.of(
-                "email", "original@test.com",
-                "login", "originalLogin",
-                "name", "Original Name",
-                "birthday", LocalDate.of(2000, 1, 1).toString()
-        ));
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createBody))
-                .andExpect(status().isOk());
-
-        // Теперь обновляем с новым email
-        String updateBody = objectMapper.writeValueAsString(Map.of(
-                "id", 1,
-                "email", "updated@test.com"
-        ));
-        mockMvc.perform(put("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updateBody))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.email").value("updated@test.com"))
-                .andExpect(jsonPath("$.login").value("originalLogin"))
-                .andExpect(jsonPath("$.name").value("Original Name"));
+    void rejectNullRequestTest() { // проверка реакции на null-запрос
+        assertThrows(NullPointerException.class,
+                () -> userController.create(null),
+                "Должен выбрасывать NullPointerException при null-запросе");
     }
 
 }

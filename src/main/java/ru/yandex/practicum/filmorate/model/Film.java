@@ -1,30 +1,29 @@
 package ru.yandex.practicum.filmorate.model;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.PastOrPresent;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
-import ru.yandex.practicum.filmorate.validation.BuildOperations;
-import ru.yandex.practicum.filmorate.validation.UpdateOperations;
-
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 public class Film {
-    @EqualsAndHashCode.Include
+
     private Long id;
 
-    @NotBlank(message = "Название фильма не может быть пустым", groups = {BuildOperations.class, UpdateOperations.class})
+    @NotBlank(message = "Название фильма не может быть пустым")
     private String name;
 
-    @Size(max = 200, message = "Размер описания не должен превышать 200 символов", groups = {BuildOperations.class, UpdateOperations.class})
+    @Size(max = 200, message = "Размер описания не должен превышать 200 символов")
     private String description;
 
-    @PastOrPresent(message = "Дата релиза не должна быть позже текущего дня", groups = {BuildOperations.class})
-    LocalDate releaseDate;
+    @NotNull(message = "Дата релиза обязательна")
+    //@Positive(message = "Продолжительность должна быть положительным числом")
+    private LocalDate releaseDate;
 
-    @Positive(message = "Длительность должна быть положительной", groups = {BuildOperations.class, UpdateOperations.class})
-    Integer duration;
+    @NotNull(message = "Продолжительность должна быть указана")
+    @Positive(message = "Продолжительность должна быть положительной")
+    private Integer duration;
+
+    private final Set<Long> likes = new HashSet<>();
 }

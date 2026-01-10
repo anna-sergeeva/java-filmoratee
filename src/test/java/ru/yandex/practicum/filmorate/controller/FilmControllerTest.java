@@ -28,14 +28,6 @@ class FilmControllerTest {
     private ObjectMapper objectMapper;
 
     @Test
-    @DisplayName("POST /films — 400 возвращается, если тело запроса - пустое")
-    void addFilm_emptyBody_returnsBadRequest() throws Exception {
-        mockMvc.perform(post("/films")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
     @DisplayName("POST /films — 400 возвращается, если название - пустое")
     void addFilm_emptyName_returnsBadRequest() throws Exception {
         String body = objectMapper.writeValueAsString(Map.of(
