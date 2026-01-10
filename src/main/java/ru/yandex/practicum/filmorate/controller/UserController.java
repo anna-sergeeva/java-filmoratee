@@ -57,27 +57,21 @@ public class UserController {
         if (newUser.getBirthday() != null) {
             oldUser.setBirthday(newUser.getBirthday());
         }
-    
         if (newUser.getEmail() != null) {
             oldUser.setEmail(newUser.getEmail());
         }
-    
         if (newUser.getName() != null) {
             oldUser.setName(newUser.getName());
         }
-    
         if (newUser.getLogin() != null) {
             oldUser.setLogin(newUser.getLogin());
         }
-
     // 4. Если имя пустое — заменяем на логин (по бизнес-логике)
         if (oldUser.getName() != null && oldUser.getName().isBlank()) {
             oldUser.setName(oldUser.getLogin());
         }
-
     // 5. Логируем успешное обновление
         log.info("Данные пользователя {} обновлены", oldUser);
-
         return oldUser;
     }
 
