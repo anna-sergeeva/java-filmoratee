@@ -1,112 +1,72 @@
 package ru.yandex.practicum.filmorate.controller;
 
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
-import jakarta.validation.ConstraintViolation;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import jakarta.validation.constraints.Positive;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.service.FilmService;
-import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
-import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
 import ru.yandex.practicum.filmorate.validation.ValidationGroups;
+import java.util.Collection;
+import java.util.List;
 
-import java.time.LocalDate;
-import java.util.Set;
+@Slf4j
+@RestController
+@RequestMapping("/films")
+@RequiredArgsConstructor
+@Validated
+public class FilmController {
+    private final FilmService filmService;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-class FilmControllerTests {
-
-    private FilmController controller;
-    private Validator validator;
-
-    @BeforeEach
-    void setUp() {
-        InMemoryFilmStorage filmStorage = new InMemoryFilmStorage();
-        InMemoryUserStorage userStorage = new InMemoryUserStorage();
-        FilmService filmService = new FilmService(filmStorage, userStorage);
-        controller = new FilmController(filmService);
-        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
-        validator = factory.getValidator();
+    @PostMapping
+    public Film addFilm(@Validated(ValidationGroups.OnCreate.class) @RequestBody Film film) {
+        log.debug("POST /films {}", film);
+        return filmService.addFilm(film);
     }
 
-    private Film validateFilm() {
-        Film film = new Film();
-        film.setName("Test Film");
-        film.setDescription("Description");
-        film.setDuration(120);
-        film.setReleaseDate(LocalDate.of(2000, 1, 1));
-        return film;
+    @PutMapping
+    public Film updateFilm(@Validated(ValidationGroups.OnUpdate.class) @RequestBody Film updatedFilm) {
+        log.debug("PUT /films {}", updatedFilm);
+        return filmService.updateFilm(updatedFilm);
     }
 
-    private Set<ConstraintViolation<Film>> validate(Film film, Class<?> group) {
-        return validator.validate(film, group);
+    @GetMapping("/{id}")
+    public Film getById(@PathVariable Long id) {
+        log.debug("GET /films/{}", id);
+        return filmService.getById(id);
     }
 
-    @Test
-    void shouldAddValidFilm() {
-        Film film = validateFilm();
-        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
-        assertTrue(violations.isEmpty(), "Фильм с валидными данными не должен содержать ошибок валидации");
-
-        Film saved = controller.addFilm(film);
-        assertNotNull(saved.getId());
+    @GetMapping
+    public Collection<Film> getAll() {
+        log.debug("GET /films");
+        return filmService.getAll();
     }
 
-    @Test
-    void shouldFailIfNameEmpty() {
-        Film film = validateFilm();
-        film.setName("");
-
-        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
-        assertFalse(violations.isEmpty());
-        assertTrue(violations.stream()
-                .anyMatch(v -> v.getMessage().equals("Название не может быть пустым!")));
+    // --- SERVICE операции
+    @PutMapping("/{filmId}/like/{userId}")
+    public void addLike(@PathVariable Long filmId, @PathVariable Long userId) {
+        log.debug("PUT /films/{}/like/{}", filmId, userId);
+        filmService.addLike(userId, filmId);
     }
 
-    @Test
-    void shouldFailIfDescriptionTooLong() {
-        Film film = validateFilm();
-        film.setDescription("A".repeat(201));
-
-        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
-        assertFalse(violations.isEmpty());
-        assertTrue(violations.stream()
-                .anyMatch(v -> v.getMessage().contains("Описание не может быть длиннее 200 символов")));
+    @DeleteMapping("/{filmId}/like/{userId}")
+    public void removeLike(@PathVariable Long filmId, @PathVariable Long userId) {
+        log.debug("DELETE /films/{}/like/{}", filmId, userId);
+        filmService.removeLike(userId, filmId);
     }
 
-    @Test
-    void shouldFailIfDurationInvalid() {
-        Film film = validateFilm();
-        film.setDuration(0);
-
-        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
-        assertFalse(violations.isEmpty());
-        assertTrue(violations.stream()
-                .anyMatch(v -> v.getMessage().contains("Продолжительность должна быть больше 0")));
-    }
-
-    @Test
-    void shouldFailIfReleaseDateInvalid() {
-        Film film = validateFilm();
-        film.setReleaseDate(LocalDate.of(1800, 1, 1));
-
-        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
-        assertFalse(violations.isEmpty());
-        assertTrue(violations.stream()
-                .anyMatch(v -> v.getMessage().contains("Некорректная дата релиза")));
-    }
-
-    @Test
-    void shouldFailIfReleaseDateNull() {
-        Film film = validateFilm();
-        film.setReleaseDate(null);
-
-        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
-        assertFalse(violations.isEmpty());
-        assertTrue(violations.stream()
-                .anyMatch(v -> v.getMessage().contains("Дата релиза должна быть указана")));
+    @GetMapping("/popular")
+    public List<Film> getPopular(@RequestParam(defaultValue = "10") @Positive int count) {
+        log.debug("GET /films/popular?count={}", count);
+        return filmService.getPopularFilms(count);
     }
 }
