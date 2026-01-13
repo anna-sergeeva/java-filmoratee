@@ -3,6 +3,7 @@ package ru.yandex.practicum.filmorate.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,44 +13,63 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.UserService;
-import ru.yandex.practicum.filmorate.validation.OnCreate;
-import ru.yandex.practicum.filmorate.validation.OnUpdate;
-import java.util.List;
+import ru.yandex.practicum.filmorate.validation.ValidationGroups;
+import java.util.Collection;
 
+@Slf4j
 @RestController
 @RequestMapping("/users")
-@Slf4j
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
 
-    @GetMapping
-    public List<User> findAll() {
-        log.info("Запрос на получение всех пользователей");
-        return userService.findAll();
-    }
-
-    @GetMapping("/{id}")
-    public User getUserById(@PathVariable Long id) {
-        log.info("Запрос пользователя по id: {}", id);
-        return userService.findById(id);
-    }
-
+    // --- STORAGE операции
     @PostMapping
-    public User create(@Validated(OnCreate.class) @RequestBody User user) {
-        log.info("Запрос на создание пользователя: {}", user);
-        if (user.getName() == null || user.getName().isBlank()) {
-            user.setName(user.getLogin());
-        }
-        return userService.create(user);
+    public User addUser(@Validated(ValidationGroups.OnCreate.class) @RequestBody User user) {
+        log.debug("POST /users {}", user);
+        return userService.addUser(user);
     }
 
     @PutMapping
-    public User update(@Validated(OnUpdate.class) @RequestBody User newUser) {
-        log.info("Запрос на обновление пользователя: {}", newUser);
-        if (newUser.getName() == null || newUser.getName().isBlank()) {
-            newUser.setName(newUser.getLogin());
-        }
-        return userService.update(newUser);
+    public User updateUser(@Validated(ValidationGroups.OnUpdate.class) @RequestBody User updatedUser) {
+        log.debug("PUT /users {}", updatedUser);
+        return userService.updateUser(updatedUser);
+    }
+
+    @GetMapping("/{id}")
+    public User getById(@PathVariable Long id) {
+        log.debug("GET /users/{}", id);
+        return userService.getById(id);
+    }
+
+    @GetMapping
+    public Collection<User> getAll() {
+        log.debug("GET /users");
+        return userService.getAll();
+    }
+
+    // --- SERVICE операции
+    @PutMapping("/{id}/friends/{friendId}")
+    public void addFriend(@PathVariable Long id, @PathVariable Long friendId) {
+        log.debug("PUT /users/{}/friends/{}", id, friendId);
+        userService.addFriend(id, friendId);
+    }
+
+    @DeleteMapping("/{id}/friends/{friendId}")
+    public void removeFriend(@PathVariable Long id, @PathVariable Long friendId) {
+        log.debug("DELETE /users/{}/friends/{}", id, friendId);
+        userService.removeFriend(id, friendId);
+    }
+
+    @GetMapping("/{id}/friends")
+    public Collection<User> getFriends(@PathVariable Long id) {
+        log.debug("GET /users/{}/friends", id);
+        return userService.getFriends(id);
+    }
+
+    @GetMapping("/{id}/friends/common/{otherId}")
+    public Collection<User> getCommonFriends(@PathVariable Long id, @PathVariable Long otherId) {
+        log.debug("GET /users/{}/friends/common/{}", id, otherId);
+        return userService.getCommonFriends(id, otherId);
     }
 }

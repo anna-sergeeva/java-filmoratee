@@ -2,32 +2,34 @@ package ru.yandex.practicum.filmorate.model;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Null;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
-import ru.yandex.practicum.filmorate.validation.OnCreate;
-import ru.yandex.practicum.filmorate.validation.OnUpdate;
+import ru.yandex.practicum.filmorate.validation.ValidationGroups;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 
+
 @Data
 public class User {
-
+    private String name;
+    @Null(groups = ValidationGroups.OnCreate.class)
+    @NotNull(groups = ValidationGroups.OnUpdate.class)
     private Long id;
 
-    @NotBlank(message = "Электронная почта не может быть пустой", groups = OnCreate.class)
-    @Email(message = "Электронная почта должна содержать символ @ и быть корректной", groups = {OnCreate.class, OnUpdate.class})
+    @NotBlank(message = "Имэйл не может быть пустым", groups = ValidationGroups.OnCreate.class)
+    @Email(message = "Имэйл должен содержать символ @", groups = ValidationGroups.OnCreate.class)
     private String email;
 
-    @NotBlank(message = "Логин не может быть пустым", groups = OnCreate.class)
-    @Pattern(regexp = "\\S+", message = "Логин не может содержать пробелы", groups = {OnCreate.class, OnUpdate.class})
+    @NotBlank(message = "Логин не может быть пустым", groups = ValidationGroups.OnCreate.class)
+    @Pattern(regexp = "^\\S+$", message = "Логин не должен содержать пробелы", groups = ValidationGroups.OnCreate.class)
     private String login;
 
-    private String name;
-
-    @PastOrPresent(message = "Дата рождения не может быть в будущем", groups = {OnCreate.class, OnUpdate.class})
+    @NotNull(message = "Дата рождения не может быть пустой", groups = ValidationGroups.OnCreate.class)
+    @PastOrPresent(message = "Дата рождения не может быть в будущем", groups = {ValidationGroups.OnCreate.class, ValidationGroups.OnUpdate.class})
     private LocalDate birthday;
-
-    private final Set<Long> friends = new HashSet<>();
+    private Set<Long> friends = new HashSet<>();
 }

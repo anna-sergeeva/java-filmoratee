@@ -3,11 +3,14 @@ package ru.yandex.practicum.filmorate.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.exception.EntityNotFoundException;
+import ru.yandex.practicum.filmorate.exception.LikeOperationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
-import java.util.Comparator;
+
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -18,43 +21,53 @@ public class FilmService {
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
 
-    public List<Film> findAll() {
-        return filmStorage.findAll();
+    public Film addFilm(Film film) {
+        return filmStorage.addFilm(film);
     }
 
-    public Film findById(Long id) {
-        return filmStorage.findById(id);
+    public Film updateFilm(Film film) {
+        return filmStorage.updateFilm(film);
     }
 
-    public Film create(Film film) {
-        return filmStorage.create(film);
+    public Film getById(long id) {
+        return filmStorage.getById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Фильм", id));
     }
 
-    public Film update(Film film) {
-        return filmStorage.update(film);
+    public Collection<Film> getAll() {
+        return filmStorage.getAll();
     }
 
-    public void addLike(Long filmId, Long userId) {
-        log.info("Добавление лайка фильму {} от пользователя {}", filmId, userId);
-        Film film = filmStorage.findById(filmId);
-        userStorage.findById(userId);
-        film.getLikes().add(userId);
+    public void addLike(long userId, long movieId) {
+        User user = userStorage.getById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь", userId));
+        Film film = filmStorage.getById(movieId)
+                .orElseThrow(() -> new EntityNotFoundException("Фильм", movieId));
+
+        boolean added = film.getLikes().add(userId);
+        if (!added) {
+            throw new LikeOperationException("Пользователь уже ставил лайк этому фильму.");
+        }
+        log.info("Пользователь id={} поставил лайк фильму id={}", userId, movieId);
     }
 
-    public void removeLike(Long filmId, Long userId) {
-        log.info("Удаление лайка у фильма {} от пользователя {}", filmId, userId);
-        Film film = filmStorage.findById(filmId);
-        userStorage.findById(userId);
+    public void removeLike(long userId, long movieId) {
+        User user = userStorage.getById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь", userId));
+        Film film = filmStorage.getById(movieId)
+                .orElseThrow(() -> new EntityNotFoundException("Фильм", movieId));
+
+        if (!film.getLikes().contains(userId)) {
+            throw new LikeOperationException("Пользователь не добавлял лайк к данному фильму");
+        }
+
         film.getLikes().remove(userId);
+        log.info("Пользователь id={} удалил лайк с фильма id={}", userId, movieId);
     }
 
     public List<Film> getPopularFilms(int count) {
-        if (count <= 0) {
-            throw new ValidationException("Параметр count должен быть положительным");
-        }
-
-        return filmStorage.findAll().stream()
-                .sorted(Comparator.comparingInt(f -> -f.getLikes().size()))
+        return filmStorage.getAll().stream()
+                .sorted((f1, f2) -> Integer.compare(f2.getLikes().size(), f1.getLikes().size()))
                 .limit(count)
                 .collect(Collectors.toList());
     }

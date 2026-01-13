@@ -1,124 +1,111 @@
 package ru.yandex.practicum.filmorate.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.DisplayName;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
+import jakarta.validation.ConstraintViolation;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
+import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.service.FilmService;
+import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
+import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
+import ru.yandex.practicum.filmorate.validation.ValidationGroups;
 import java.time.LocalDate;
-import java.util.Map;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(classes = ru.yandex.practicum.filmorate.FilmorateApplication.class)
-@AutoConfigureMockMvc
 class FilmControllerTests {
 
-    @Autowired
-    private MockMvc mockMvc;
+    private FilmController controller;
+    private Validator validator;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @BeforeEach
+    void setUp() {
+        InMemoryFilmStorage filmStorage = new InMemoryFilmStorage();
+        InMemoryUserStorage userStorage = new InMemoryUserStorage();
+        FilmService filmService = new FilmService(filmStorage, userStorage);
+        controller = new FilmController(filmService);
+        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+        validator = factory.getValidator();
+    }
 
-    @Test
-    @DisplayName("POST /films — 400, если название пустое или из пробелов")
-    void addFilm_emptyName_returnsBadRequest() throws Exception {
-        String body = objectMapper.writeValueAsString(Map.of(
-                "name", "   ",
-                "description", "desc",
-                "releaseDate", LocalDate.of(2000, 1, 1).toString(),
-                "duration", 100
-        ));
-        mockMvc.perform(post("/films")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value(
-                        "Название не должно содержать только пробелы"));
+    private Film validateFilm() {
+        Film film = new Film();
+        film.setName("Test Film");
+        film.setDescription("Description");
+        film.setDuration(120);
+        film.setReleaseDate(LocalDate.of(2000, 1, 1));
+        return film;
+    }
+
+    private Set<ConstraintViolation<Film>> validate(Film film, Class<?> group) {
+        return validator.validate(film, group);
     }
 
     @Test
-    @DisplayName("POST /films — 400, если длина описания > 200")
-    void addFilm_longDescription_returnsBadRequest() throws Exception {
-        String longDesc = "a".repeat(201);
-        String body = objectMapper.writeValueAsString(Map.of(
-                "name", "Name",
-                "description", longDesc,
-                "releaseDate", LocalDate.of(2000, 1, 1).toString(),
-                "duration", 500
-        ));
-        mockMvc.perform(post("/films")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value(
-                        "Описание не может превышать 200 символов"));
+    void shouldAddValidFilm() {
+        Film film = validateFilm();
+        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
+        assertTrue(violations.isEmpty(), "Фильм с валидными данными не должен содержать ошибок валидации");
+
+        Film saved = controller.addFilm(film);
+        assertNotNull(saved.getId());
     }
 
     @Test
-    @DisplayName("POST /films — 400, если дата релиза ранее 1895-12-28")
-    void addFilm_tooEarlyDate_returnsBadRequest() throws Exception {
-        String body = objectMapper.writeValueAsString(Map.of(
-                "name", "Name",
-                "description", "desc",
-                "releaseDate", LocalDate.of(1895, 12, 27).toString(),
-                "duration", 100
-        ));
-        mockMvc.perform(post("/films")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value(
-                        "Дата релиза не может быть раньше 28 декабря 1895 года"));
+    void shouldFailIfNameEmpty() {
+        Film film = validateFilm();
+        film.setName("");
+
+        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
+        assertFalse(violations.isEmpty());
+        assertTrue(violations.stream()
+                .anyMatch(v -> v.getMessage().equals("Название не может быть пустым!")));
     }
 
     @Test
-    @DisplayName("POST /films — 400 при неположительной длительности")
-    void addFilm_nonPositiveDuration_returnsBadRequest() throws Exception {
-        String body = objectMapper.writeValueAsString(Map.of(
-                "name", "Name",
-                "description", "desc",
-                "releaseDate", LocalDate.of(2000, 1, 1).toString(),
-                "duration", 0
-        ));
-        mockMvc.perform(post("/films")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value(
-                        "Длительность должна быть положительной"));
+    void shouldFailIfDescriptionTooLong() {
+        Film film = validateFilm();
+        film.setDescription("A".repeat(201));
+
+        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
+        assertFalse(violations.isEmpty());
+        assertTrue(violations.stream()
+                .anyMatch(v -> v.getMessage().contains("Описание не может быть длиннее 200 символов")));
     }
 
     @Test
-    @DisplayName("POST /films — 200 при валидных данных на границе")
-    void addFilm_validBoundary_returnsOkAndEcho() throws Exception {
-        String desc200 = "a".repeat(200);
-        String body = objectMapper.writeValueAsString(Map.of(
-                "name", "Name",
-                "description", desc200,
-                "releaseDate", LocalDate.of(1895, 12, 28).toString(),
-                "duration", 1
-        ));
-        mockMvc.perform(post("/films")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.name").value("Name"))
-                .andExpect(jsonPath("$.description").value(desc200))
-                .andExpect(jsonPath("$.releaseDate").value("1895-12-28"))
-                .andExpect(jsonPath("$.duration").value(1));
+    void shouldFailIfDurationInvalid() {
+        Film film = validateFilm();
+        film.setDuration(0);
+
+        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
+        assertFalse(violations.isEmpty());
+        assertTrue(violations.stream()
+                .anyMatch(v -> v.getMessage().contains("Продолжительность должна быть больше 0")));
     }
 
     @Test
-    @DisplayName("GET /films — 200 и массив (может быть пустым)")
-    void getFilms_returnsArray() throws Exception {
-        mockMvc.perform(get("/films"))
-                .andExpect(status().isOk());
+    void shouldFailIfReleaseDateInvalid() {
+        Film film = validateFilm();
+        film.setReleaseDate(LocalDate.of(1800, 1, 1));
+
+        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
+        assertFalse(violations.isEmpty());
+        assertTrue(violations.stream()
+                .anyMatch(v -> v.getMessage().contains("Некорректная дата релиза")));
+    }
+
+    @Test
+    void shouldFailIfReleaseDateNull() {
+        Film film = validateFilm();
+        film.setReleaseDate(null);
+
+        Set<ConstraintViolation<Film>> violations = validate(film, ValidationGroups.OnCreate.class);
+        assertFalse(violations.isEmpty());
+        assertTrue(violations.stream()
+                .anyMatch(v -> v.getMessage().contains("Дата релиза должна быть указана")));
     }
 }

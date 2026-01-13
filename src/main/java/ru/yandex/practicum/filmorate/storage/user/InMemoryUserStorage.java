@@ -1,78 +1,70 @@
 package ru.yandex.practicum.filmorate.storage.user;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import ru.yandex.practicum.filmorate.exception.DuplicatedDataException;
-import ru.yandex.practicum.filmorate.exception.NotFoundException;
-import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.exception.EntityNotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.Comparator;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
+@Slf4j
 @Component
 public class InMemoryUserStorage implements UserStorage {
-    private final Map<Long, User> users = new HashMap<>();
-    private final Set<String> usedEmails = new HashSet<>();
     private long nextId = 1;
+    private final Map<Long, User> users = new HashMap<>();
 
     @Override
-    public List<User> findAll() {
-        return users.values().stream()
-                .sorted(Comparator.comparingLong(User::getId))
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public User create(User user) {
-        if (usedEmails.contains(user.getEmail())) {
-            throw new DuplicatedDataException("Этот имейл уже используется");
+    public User addUser(User user) {
+        if (user.getName() == null || user.getName().isBlank()) {
+            user.setName(user.getLogin());
+            log.info("Имя отсутствует, использован логин как имя: {}", user.getLogin());
         }
-        user.setId(nextId++);
+
+        user.setId(getNextId());
         users.put(user.getId(), user);
-        usedEmails.add(user.getEmail());
+        log.info("Пользователь успешно добавлен: {}", user);
         return user;
     }
 
     @Override
-    public User update(User user) {
-        if (user.getId() == null) {
-            throw new ValidationException("Id должен быть указан");
-        }
-        if (!users.containsKey(user.getId())) {
-            throw new NotFoundException("Пользователь не найден");
+    public User updateUser(User updatedUser) {
+        if (updatedUser.getId() == null || !users.containsKey(updatedUser.getId())) {
+            log.warn("Ошибка обновления: пользователь с id={} не найден", updatedUser.getId());
+            throw new EntityNotFoundException("Пользователь", updatedUser.getId());
         }
 
-        User oldUser = users.get(user.getId());
+        User oldUser = users.get(updatedUser.getId());
 
-        if (user.getEmail() != null && !oldUser.getEmail().equals(user.getEmail())) {
-            if (usedEmails.contains(user.getEmail())) {
-                throw new DuplicatedDataException("Этот имейл уже используется");
-            }
-            usedEmails.remove(oldUser.getEmail());
-            usedEmails.add(user.getEmail());
+        if (updatedUser.getName() != null) {
+            oldUser.setName(updatedUser.getName().isBlank() ? updatedUser.getLogin() : updatedUser.getName());
+        }
+        if (updatedUser.getEmail() != null) {
+            oldUser.setEmail(updatedUser.getEmail());
+        }
+        if (updatedUser.getLogin() != null) {
+            oldUser.setLogin(updatedUser.getLogin());
+        }
+        if (updatedUser.getBirthday() != null) {
+            oldUser.setBirthday(updatedUser.getBirthday());
         }
 
-        users.put(user.getId(), user);
-        return user;
+        log.info("Пользователь успешно обновлён: {}", oldUser);
+        return updatedUser;
     }
 
     @Override
-    public User findById(Long id) {
-        if (!users.containsKey(id)) {
-            throw new NotFoundException("Пользователь с id=" + id + " не найден");
-        }
-        return users.get(id);
+    public Optional<User> getById(Long id) {
+        return Optional.ofNullable(users.get(id));
     }
 
     @Override
-    public void delete(Long id) {
-        User user = users.remove(id);
-        if (user != null) {
-            usedEmails.remove(user.getEmail());
-        }
+    public Collection<User> getAll() {
+        return users.values();
+    }
+
+    private Long getNextId() {
+        return nextId++;
     }
 }

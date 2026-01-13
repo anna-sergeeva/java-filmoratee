@@ -1,56 +1,65 @@
 package ru.yandex.practicum.filmorate.storage.film;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import ru.yandex.practicum.filmorate.exception.NotFoundException;
-import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.exception.EntityNotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
-import java.util.Comparator;
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
+@Slf4j
 @Component
 public class InMemoryFilmStorage implements FilmStorage {
-    private final Map<Long, Film> films = new HashMap<>();
     private long nextId = 1;
+    private final Map<Long, Film> films = new HashMap<>();
 
     @Override
-    public List<Film> findAll() {
-        return films.values().stream()
-                .sorted(Comparator.comparingLong(Film::getId))
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public Film create(Film film) {
-        film.setId(nextId++);
+    public Film addFilm(Film film) {
+        film.setId(getNextId());
         films.put(film.getId(), film);
+        log.info("Фильм успешно добавлен: {}", film);
         return film;
     }
 
     @Override
-    public Film update(Film film) {
-        if (film.getId() == null) {
-            throw new ValidationException("Id должен быть указан");
+    public Film updateFilm(Film updatedFilm) {
+        if (!films.containsKey(updatedFilm.getId())) {
+            log.warn("Ошибка обновления: фильм с id={} не найден", updatedFilm.getId());
+            throw new EntityNotFoundException("Фильм", updatedFilm.getId());
         }
-        if (!films.containsKey(film.getId())) {
-            throw new NotFoundException("Фильм не найден");
+
+        Film oldFilm = films.get(updatedFilm.getId());
+
+        if (updatedFilm.getName() != null) {
+            oldFilm.setName(updatedFilm.getName());
         }
-        films.put(film.getId(), film);
-        return film;
+        if (updatedFilm.getDescription() != null) {
+            oldFilm.setDescription(updatedFilm.getDescription());
+        }
+        if (updatedFilm.getReleaseDate() != null) {
+            oldFilm.setReleaseDate(updatedFilm.getReleaseDate());
+        }
+        if (updatedFilm.getDuration() != null) {
+            oldFilm.setDuration(updatedFilm.getDuration());
+        }
+
+        log.info("Фильм успешно обновлён: {}", updatedFilm);
+        return updatedFilm;
     }
 
     @Override
-    public Film findById(Long id) {
-        if (!films.containsKey(id)) {
-            throw new NotFoundException("Фильм с id=" + id + " не найден");
-        }
-        return films.get(id);
+    public Optional<Film> getById(Long id) {
+        return Optional.ofNullable(films.get(id));
     }
 
     @Override
-    public void delete(Long id) {
-        films.remove(id);
+    public Collection<Film> getAll() {
+        return films.values();
+    }
+
+    private Long getNextId() {
+        return nextId++;
     }
 }

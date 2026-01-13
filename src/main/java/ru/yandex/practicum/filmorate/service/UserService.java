@@ -3,9 +3,11 @@ package ru.yandex.practicum.filmorate.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.exception.EntityNotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
-import java.util.HashSet;
+import ru.yandex.practicum.filmorate.validation.FriendValidator;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -16,56 +18,81 @@ import java.util.stream.Collectors;
 public class UserService {
     private final UserStorage userStorage;
 
-    public List<User> findAll() {
-        return userStorage.findAll();
+    public User addUser(User user) {
+        return userStorage.addUser(user);
     }
 
-    public User findById(Long id) {
-        return userStorage.findById(id);
+    public User updateUser(User user) {
+        return userStorage.updateUser(user);
     }
 
-    public User create(User user) {
-        return userStorage.create(user);
+    public User getById(long id) {
+        return userStorage.getById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь", id));
     }
 
-    public User update(User user) {
-        userStorage.findById(user.getId());
-        return userStorage.update(user);
+    public Collection<User> getAll() {
+        return userStorage.getAll();
     }
 
-    public void addFriend(Long userId, Long friendId) {
-        log.info("Добавление в друзья: пользователь {} -> пользователь {}", userId, friendId);
+    public void addFriend(long userId, long friendId) {
+        FriendValidator.validateAddFriend(userId, friendId);
 
-        User user = userStorage.findById(userId);
-        User friend = userStorage.findById(friendId);
-
-        user.getFriends().add(friendId);
-        friend.getFriends().add(userId);
+        User user = userStorage.getById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь", userId));
+        User friend = userStorage.getById(friendId)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь", friendId));
+        user.getFriends().add(friend.getId());
+        friend.getFriends().add(user.getId());
+        log.info("Пользователи с id={} и id={} теперь друзья", userId, friendId);
     }
 
-    public void removeFriend(Long userId, Long friendId) {
-        User user = userStorage.findById(userId);
-        User friend = userStorage.findById(friendId);
+    public void removeFriend(long userId, long friendId) {
+        User user = userStorage.getById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь", userId));
+        User friend = userStorage.getById(friendId)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь", friendId));
 
-        if (user.getFriends().contains(friendId)) {
-            user.getFriends().remove(friendId);
+        if (!user.getFriends().contains(friendId)) {
+            log.warn("Попытка удалить несуществующего друга: userId={} friendId={}", userId, friendId);
+            return;
         }
-        if (friend.getFriends().contains(userId)) {
-            friend.getFriends().remove(userId);
+
+        user.getFriends().remove(friendId);
+        friend.getFriends().remove(userId);
+        log.info("Пользователь с id={} удалил из друзей пользователя с id={}", userId, friendId);
+    }
+
+    public Collection<User> getFriends(long userId) {
+        User user = userStorage.getById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь", userId));
+
+        Set<Long> friendIds = user.getFriends();
+        if (friendIds == null || friendIds.isEmpty()) {
+            return List.of();
         }
+
+        return friendIds.stream()
+                .map(this::getById)
+                .toList();
     }
 
-    public List<User> getFriends(Long userId) {
-        return userStorage.findById(userId).getFriends().stream()
-                .map(userStorage::findById)
-                .collect(Collectors.toList());
-    }
+    public List<User> getCommonFriends(long userId, long friendId) {
+        User user = userStorage.getById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь", userId));
+        User friend = userStorage.getById(friendId)
+                .orElseThrow(() -> new EntityNotFoundException("Пользователь", friendId));
 
-    public List<User> getCommonFriends(Long userId, Long friendId) {
-        Set<Long> commonIds = new HashSet<>(userStorage.findById(userId).getFriends());
-        commonIds.retainAll(userStorage.findById(friendId).getFriends());
+        Set<Long> commonIds = user.getFriends().stream()
+                .filter(friend.getFriends()::contains)
+                .collect(Collectors.toSet());
+        log.info(
+                "Общие друзья пользователей {} и {}: {}",
+                userId, friendId, commonIds
+        );
         return commonIds.stream()
-                .map(userStorage::findById)
+                .map(id -> userStorage.getById(id)
+                        .orElseThrow(() -> new EntityNotFoundException("Пользователь", id)))
                 .collect(Collectors.toList());
     }
 }
