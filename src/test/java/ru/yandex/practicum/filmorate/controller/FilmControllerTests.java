@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDate;
 import java.util.Map;
@@ -15,10 +14,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+
 @SpringBootTest(classes = ru.yandex.practicum.filmorate.FilmorateApplication.class)
 @AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-
 class FilmControllerTests {
 
     @Autowired
@@ -28,10 +26,10 @@ class FilmControllerTests {
     private ObjectMapper objectMapper;
 
     @Test
-    @DisplayName("POST /films — 400 возвращается, если название - пустое")
+    @DisplayName("POST /films — 400, если название пустое или из пробелов")
     void addFilm_emptyName_returnsBadRequest() throws Exception {
         String body = objectMapper.writeValueAsString(Map.of(
-                "name", " ",
+                "name", "   ",
                 "description", "desc",
                 "releaseDate", LocalDate.of(2000, 1, 1).toString(),
                 "duration", 100
@@ -39,23 +37,27 @@ class FilmControllerTests {
         mockMvc.perform(post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(
+                        "Название не должно содержать только пробелы"));
     }
 
     @Test
-    @DisplayName("POST /films — 400 , если длина описания > 200")
+    @DisplayName("POST /films — 400, если длина описания > 200")
     void addFilm_longDescription_returnsBadRequest() throws Exception {
         String longDesc = "a".repeat(201);
         String body = objectMapper.writeValueAsString(Map.of(
                 "name", "Name",
                 "description", longDesc,
                 "releaseDate", LocalDate.of(2000, 1, 1).toString(),
-                "duration", 100
+                "duration", 500
         ));
         mockMvc.perform(post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(
+                        "Описание не может превышать 200 символов"));
     }
 
     @Test
@@ -70,7 +72,9 @@ class FilmControllerTests {
         mockMvc.perform(post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(
+                        "Дата релиза не может быть раньше 28 декабря 1895 года"));
     }
 
     @Test
@@ -85,11 +89,13 @@ class FilmControllerTests {
         mockMvc.perform(post("/films")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(
+                        "Длительность должна быть положительной"));
     }
 
     @Test
-    @DisplayName("POST /films — 200 при валидных данных на границе (desc=200, date=1895-12-28, duration=1)")
+    @DisplayName("POST /films — 200 при валидных данных на границе")
     void addFilm_validBoundary_returnsOkAndEcho() throws Exception {
         String desc200 = "a".repeat(200);
         String body = objectMapper.writeValueAsString(Map.of(
@@ -103,7 +109,10 @@ class FilmControllerTests {
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.name").value("Name"));
+                .andExpect(jsonPath("$.name").value("Name"))
+                .andExpect(jsonPath("$.description").value(desc200))
+                .andExpect(jsonPath("$.releaseDate").value("1895-12-28"))
+                .andExpect(jsonPath("$.duration").value(1));
     }
 
     @Test

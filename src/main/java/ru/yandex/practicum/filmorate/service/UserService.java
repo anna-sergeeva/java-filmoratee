@@ -1,7 +1,7 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
@@ -12,13 +12,9 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class UserService {
     private final UserStorage userStorage;
-
-    @Autowired
-    public UserService(UserStorage userStorage) {
-        this.userStorage = userStorage;
-    }
 
     public List<User> findAll() {
         return userStorage.findAll();
@@ -45,11 +41,9 @@ public class UserService {
 
         user.getFriends().add(friendId);
         friend.getFriends().add(userId);
-
     }
 
     public void removeFriend(Long userId, Long friendId) {
-
         User user = userStorage.findById(userId);
         User friend = userStorage.findById(friendId);
 
@@ -59,7 +53,6 @@ public class UserService {
         if (friend.getFriends().contains(userId)) {
             friend.getFriends().remove(userId);
         }
-
     }
 
     public List<User> getFriends(Long userId) {
@@ -75,9 +68,4 @@ public class UserService {
                 .map(userStorage::findById)
                 .collect(Collectors.toList());
     }
-
-    public boolean emailExists(String email) {
-        return userStorage.emailExists(email);
-    }
-
 }

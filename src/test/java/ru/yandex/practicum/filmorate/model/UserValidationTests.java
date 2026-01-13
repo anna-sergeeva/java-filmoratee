@@ -6,10 +6,10 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
+import ru.yandex.practicum.filmorate.validation.OnCreate;
+import ru.yandex.practicum.filmorate.validation.OnUpdate;
 import java.time.LocalDate;
 import java.util.Set;
-
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -28,53 +28,57 @@ class UserValidationTests {
     }
 
     @Test
-    void emailIsBlankTest() { // проверка пустого email
-        User user = validUser;
+    void emailIsBlankOnCreateTest() {
+        User user = new User();
         user.setEmail("");
-        Set<ConstraintViolation<User>> violations = validator.validate(user);
-        assertFalse(violations.isEmpty(), "Должны быть ошибки валидации при пустом email");
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("пустой")),
-                "Сообщение об ошибке должно указывать на пустой email");
+        Set<ConstraintViolation<User>> violations = validator.validate(user, OnCreate.class);
+        assertFalse(violations.isEmpty(), "Должны быть ошибки валидации при пустом email (создание)");
+        assertTrue(violations.stream()
+                        .anyMatch(v -> v.getMessage().equals("Электронная почта не может быть пустой")),
+                "Сообщение об ошибке должно точно соответствовать ожидаемому");
     }
 
     @Test
-    void emailWithoutSymbolTest() { // проверка email без @
+    void emailInvalidFormatOnUpdateTest() {
         User user = validUser;
         user.setEmail("invalid-email");
-        Set<ConstraintViolation<User>> violations = validator.validate(user);
-        assertFalse(violations.isEmpty(), "Должны быть ошибки валидации при email без @");
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("содержать символ @")),
-                "Сообщение об ошибке должно требовать символ @ в email");
+        Set<ConstraintViolation<User>> violations = validator.validate(user, OnUpdate.class);
+        assertFalse(violations.isEmpty(), "Должны быть ошибки валидации при некорректном email (обновление)");
+        assertTrue(violations.stream()
+                        .anyMatch(v -> v.getMessage().equals("Электронная почта должна содержать символ @ и быть корректной")),
+                "Сообщение об ошибке должно точно соответствовать ожидаемому");
     }
 
     @Test
-    void loginIsBlankTest() { // проверка пустого логина
-        User user = validUser;
+    void loginIsBlankOnCreateTest() {
+        User user = new User();
         user.setLogin("");
-        Set<ConstraintViolation<User>> violations = validator.validate(user);
-        assertFalse(violations.isEmpty(), "Должны быть ошибки валидации при пустом логине");
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("пустым")),
-                "Сообщение об ошибке должно указывать на пустой логин");
+        Set<ConstraintViolation<User>> violations = validator.validate(user, OnCreate.class);
+        assertFalse(violations.isEmpty(), "Должны быть ошибки валидации при пустом логине (создание)");
+        assertTrue(violations.stream()
+                        .anyMatch(v -> v.getMessage().equals("Логин не может быть пустым")),
+                "Сообщение об ошибке должно точно соответствовать ожидаемому");
     }
 
     @Test
-    void loginHasSpacesTest() { // проверка логина с пробелами
+    void loginHasSpacesOnUpdateTest() {
         User user = validUser;
         user.setLogin("login with spaces");
-        Set<ConstraintViolation<User>> violations = validator.validate(user);
-        assertFalse(violations.isEmpty(), "Должны быть ошибки валидации при логине с пробелами");
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("пробелы")),
-                "Сообщение об ошибке должно запрещать пробелы в логине");
+        Set<ConstraintViolation<User>> violations = validator.validate(user, OnUpdate.class);
+        assertFalse(violations.isEmpty(), "Должны быть ошибки валидации при логине с пробелами (обновление)");
+        assertTrue(violations.stream()
+                        .anyMatch(v -> v.getMessage().equals("Логин не может содержать пробелы")),
+                "Сообщение об ошибке должно точно соответствовать ожидаемому");
     }
 
     @Test
-    void birthdayInFutureTest() { // проверка даты рождения в будущем
+    void birthdayInFutureOnUpdateTest() {
         User user = validUser;
         user.setBirthday(LocalDate.now().plusDays(1));
-        Set<ConstraintViolation<User>> violations = validator.validate(user);
-        assertFalse(violations.isEmpty(), "Должны быть ошибки валидации при дате рождения в будущем");
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("будущем")),
-                "Сообщение об ошибке должно запрещать дату рождения в будущем");
+        Set<ConstraintViolation<User>> violations = validator.validate(user, OnUpdate.class);
+        assertFalse(violations.isEmpty(), "Должны быть ошибки валидации при дате рождения в будущем (обновление)");
+        assertTrue(violations.stream()
+                        .anyMatch(v -> v.getMessage().equals("Дата рождения не может быть в будущем")),
+                "Сообщение об ошибке должно точно соответствовать ожидаемому");
     }
-
 }

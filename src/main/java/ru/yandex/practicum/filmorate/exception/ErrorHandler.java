@@ -9,49 +9,47 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Map;
-
 @RestControllerAdvice
 public class ErrorHandler {
-    private static final Logger log = LoggerFactory.getLogger(ErrorHandler.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ErrorHandler.class);
+
 
     @ExceptionHandler(ValidationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Map<String, String> handleValidationException(final ValidationException e) {
-        log.error("Ошибка валидации: {}", e.getMessage());
-        return Map.of("error", e.getMessage());
+    public ErrorResponse handleValidationException(final ValidationException e) {
+        LOG.error("Ошибка валидации: {}", e.getMessage());
+        return new ErrorResponse(e.getMessage());
     }
 
     @ExceptionHandler(NotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public Map<String, String> handleNotFoundException(final NotFoundException e) {
-        log.error("Объект не найден: {}", e.getMessage());
-        return Map.of("error", e.getMessage());
+    public ErrorResponse handleNotFoundException(final NotFoundException e) {
+        LOG.error("Объект не найден: {}", e.getMessage());
+        return new ErrorResponse(e.getMessage());
     }
 
     @ExceptionHandler(DuplicatedDataException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public Map<String, String> handleDuplicatedDataException(final DuplicatedDataException e) {
-        log.error("Дублирование данных: {}", e.getMessage());
-        return Map.of("error", e.getMessage());
+    public ErrorResponse handleDuplicatedDataException(final DuplicatedDataException e) {
+        LOG.error("Дублирование данных: {}", e.getMessage());
+        return new ErrorResponse(e.getMessage());
     }
 
     @ExceptionHandler(Throwable.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Map<String, String> handleThrowable(final Throwable e) {
-        log.error("Непредвиденная ошибка: {}", e.getMessage(), e);
-        return Map.of("error", "Произошла непредвиденная ошибка.");
+    public ErrorResponse handleThrowable(final Throwable e) {
+        LOG.error("Непредвиденная ошибка: {}", e.getMessage(), e);
+        return new ErrorResponse("Произошла непредвиденная ошибка.");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Map<String, String> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
+    public ErrorResponse handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
         String errorMessage = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .findFirst()
                 .orElse("Ошибка валидации");
-        log.error("Ошибка валидации: {}", errorMessage);
-        return Map.of("error", errorMessage);
+        LOG.error("Ошибка валидации: {}", errorMessage);
+        return new ErrorResponse(errorMessage);
     }
-
 }
