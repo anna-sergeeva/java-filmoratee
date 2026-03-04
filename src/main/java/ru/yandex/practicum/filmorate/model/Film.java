@@ -1,30 +1,36 @@
 package ru.yandex.practicum.filmorate.model;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Null;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
-import ru.yandex.practicum.filmorate.validation.BuildOperations;
-import ru.yandex.practicum.filmorate.validation.UpdateOperations;
-
+import ru.yandex.practicum.filmorate.validation.ReleaseDateConstraint;
+import ru.yandex.practicum.filmorate.validation.ValidationGroups;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
+
 
 @Data
 public class Film {
-    @EqualsAndHashCode.Include
+    @Null(groups = ValidationGroups.OnCreate.class)
+    @NotNull(groups = ValidationGroups.OnUpdate.class)
     private Long id;
 
-    @NotBlank(message = "Название фильма не может быть пустым", groups = {BuildOperations.class, UpdateOperations.class})
+    @NotBlank(message = "Название не может быть пустым!", groups = ValidationGroups.OnCreate.class)
     private String name;
 
-    @Size(max = 200, message = "Размер описания не должен превышать 200 символов", groups = {BuildOperations.class, UpdateOperations.class})
+    @Size(max = 200, message = "Описание не может быть длиннее 200 символов!", groups = {ValidationGroups.OnCreate.class, ValidationGroups.OnUpdate.class})
     private String description;
 
-    @PastOrPresent(message = "Дата релиза не должна быть позже текущего дня", groups = {BuildOperations.class})
-    LocalDate releaseDate;
+    @NotNull(message = "Дата релиза должна быть указана!", groups = ValidationGroups.OnCreate.class)
+    @ReleaseDateConstraint(groups = {ValidationGroups.OnCreate.class, ValidationGroups.OnUpdate.class})
+    private LocalDate releaseDate;
 
-    @Positive(message = "Длительность должна быть положительной", groups = {BuildOperations.class, UpdateOperations.class})
-    Integer duration;
+    @NotNull(message = "Продолжительность должна быть указана!", groups = ValidationGroups.OnCreate.class)
+    @Positive(message = "Продолжительность должна быть больше 0", groups = {ValidationGroups.OnCreate.class, ValidationGroups.OnUpdate.class})
+    private Integer duration;
+    private Set<Long> likes = new HashSet<>();
 }
